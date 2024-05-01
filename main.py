@@ -6,6 +6,7 @@ import bcrypt
 import jwt
 import os
 from dotenv import load_dotenv
+from random import randint
 
 load_dotenv()
 
@@ -35,7 +36,7 @@ def sign_up():
     if user is not None:
         return jsonify(feedback(False,403,'Account already exist with this email.'))
     hashed_password = bcrypt.hashpw(data['password'].encode('utf-8'),bcrypt.gensalt())
-    db.user.insert_one({'userName':data['userName'],'email':data['email'],'password':hashed_password})
+    db.user.insert_one({'userName':data['userName'],'email':data['email'],'password':hashed_password,'avatar':"https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png"})
     return jsonify(feedback(True,201))
 
 
@@ -59,6 +60,31 @@ def sign_in():
     res = make_response(jsonify(feedback(True,200,'Login Success',user)))
     res.set_cookie('token',encoded_jwt, httponly=True)
     return res
+
+@app.route('/google',methods=['POST'])
+def google():
+    data = request.json
+    user = db.user.find_one({'email':data['email']})
+    if user:
+        del user['password']
+        user['_id'] = str(user['_id'])
+        encoded_jwt = jwt.encode({"id": str(user['_id'])}, os.getenv('SECRET') , algorithm=os.getenv('ALOGORITHMS'))
+        res = make_response(jsonify(feedback(True,200,'Login Success',user)))
+        res.set_cookie('token',encoded_jwt, httponly=True)
+        return res
+    password = str(hex(randint(11111111,99999999)))
+    hashed_password =  bcrypt.hashpw(password.encode('utf-8'),bcrypt.gensalt())
+    id = db.user.insert_one({'userName':data['userName'],'email':data['email'],'password':hashed_password,'avatar':data['avatar']})
+    new_user = db.user.find_one({'_id':id.inserted_id})
+    del new_user['password']
+    new_user['_id'] = str(new_user['_id'])
+
+    encoded_jwt = jwt.encode({"id": str(new_user['_id'])}, os.getenv('SECRET') , algorithm=os.getenv('ALOGORITHMS'))    
+    
+    res = make_response(jsonify(feedback(True,200,'Login Success',new_user)))
+    res.set_cookie('token',encoded_jwt, httponly=True)
+    return res
+    
 
 
 
