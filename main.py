@@ -38,7 +38,7 @@ def sign_up():
     if user is not None:
         return jsonify(feedback(False,403,'Account already exist with this email.'))
     hashed_password = bcrypt.hashpw(data['password'].encode('utf-8'),bcrypt.gensalt())
-    db.user.insert_one({'userName':data['userName'],'email':data['email'],'password':hashed_password,'avatar':"https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png"})
+    db.user.insert_one({'userName':data['userName'],'email':data['email'],'password':hashed_password,'avatar':"https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png",'musics':[]})
     return jsonify(feedback(True,201))
 
 
@@ -76,7 +76,7 @@ def google():
         return res
     password = str(hex(randint(11111111,99999999)))
     hashed_password =  bcrypt.hashpw(password.encode('utf-8'),bcrypt.gensalt())
-    id = db.user.insert_one({'userName':data['userName'],'email':data['email'],'password':hashed_password,'avatar':data['avatar']})
+    id = db.user.insert_one({'userName':data['userName'],'email':data['email'],'password':hashed_password,'avatar':data['avatar'],'musics':[]})
     new_user = db.user.find_one({'_id':id.inserted_id})
     del new_user['password']
     new_user['_id'] = str(new_user['_id'])
@@ -135,6 +135,32 @@ def update_user():
         return jsonify(feedback(True,201,'Updated Successfully',updated_user))
     else :
         return jsonify(feedback(False,400,'You have Nothing to update'))
+    
+@app.route('/upload-music',methods=['POST'])
+def upload_music():
+    token = request.cookies.get('token')
+    if token is None:
+        return jsonify(feedback(False,401,'Unauthorized.'))
+        
+    valid = verify_user(token)
+    if valid is None:
+        return jsonify(feedback(False,401,'Unauthorized.'))
+    data = request.json
+    music = db.music.find_one({'title':data['title']})
+
+    if music is not None:
+        if valid['id'] not in music['users']:
+            music['users'].append(valid['id'])
+            db.music.update_one({'title':data['title']},{'$set':{'users':music['users']}})
+    else:    
+        db.music.insert_one({'title':data['title'],'album':data['album'],'artist':data['artist'],'music':data['music'],'users':[valid['id']]})
+    user = db.user.find_one({'_id':ObjectId(valid['id'])})
+    updated_music = db.music.find_one({'title':data['title']})
+    if str(updated_music['_id']) not in user['musics']:
+        user['musics'].append(str(updated_music['_id']))
+        db.user.update_one({'_id':ObjectId(valid['id'])},{'$set':{'musics':user['musics']}})
+    return jsonify(feedback(True,200)) 
+    
 
 @app.route('/sign-out')
 def sign_out():
@@ -148,6 +174,7 @@ def sign_out():
     res = jsonify(feedback(True,200))
     res.set_cookie('token','',max_age=0,samesite='None')
     return res
+
 
 
     

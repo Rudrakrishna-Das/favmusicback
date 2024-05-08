@@ -9,5 +9,6 @@ class Db:
         client = MongoClient(os.getenv('MONGO_CLIENT'))
         db = client['fav-music']
         self.user = db.user
+        self.music = db.music
 
 
