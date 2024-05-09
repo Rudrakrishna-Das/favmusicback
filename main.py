@@ -56,6 +56,7 @@ def sign_in():
     if password == False:
         return jsonify(feedback(False,403,'Please check your password.'))
     del user['password']
+    del user['musics']
     user['_id'] = str(user['_id'])
     encoded_jwt = jwt.encode({"id": str(user['_id'])}, os.getenv('SECRET') , algorithm=os.getenv('ALOGORITHMS'))    
     
@@ -69,6 +70,7 @@ def google():
     user = db.user.find_one({'email':data['email']})
     if user:
         del user['password']
+        del user['musics']
         user['_id'] = str(user['_id'])
         encoded_jwt = jwt.encode({"id": str(user['_id'])}, os.getenv('SECRET') , algorithm=os.getenv('ALOGORITHMS'))
         res = make_response(jsonify(feedback(True,200,'Login Success',user)))
@@ -160,6 +162,75 @@ def upload_music():
         user['musics'].append(str(updated_music['_id']))
         db.user.update_one({'_id':ObjectId(valid['id'])},{'$set':{'musics':user['musics']}})
     return jsonify(feedback(True,200)) 
+
+@app.route('/personal-music')
+def personal_music():
+    token = request.cookies.get('token')
+    if token is None:
+        return jsonify(feedback(False,401,'Unauthorized.'))
+        
+    valid = verify_user(token)
+    if valid is None:
+        return jsonify(feedback(False,401,'Unauthorized.'))
+    all_musics = []
+
+    user = db.user.find_one({'_id':ObjectId(valid['id'])})
+
+    for music_id in user['musics']:
+        user_music = db.music.find_one({'_id':ObjectId(music_id)})
+        del user_music['_id']
+        del user_music['users']
+        all_musics.append(user_music)
+
+    return jsonify(feedback(True,200,'',all_musics))
+@app.route('/all-music')
+def all_music():
+    cursor = db.music.find({})
+    all_musics = []
+    for document in cursor:
+        for i in range(len(document['users'])):
+            user = db.user.find_one({'_id':ObjectId(document['users'][i])})
+            document['users'][i] = user['userName']
+        del document['_id']        
+        all_musics.append(document)
+    return jsonify(feedback(True,200,'',all_musics))
+
+@app.route('/delete-music',methods=['POST'])
+def delete_music():
+    token = request.cookies.get('token')
+    print(token)
+    if token is None:
+        return jsonify(feedback(False,401,'Unauthorized.'))
+        
+    valid = verify_user(token)
+    if valid is None:
+        return jsonify(feedback(False,401,'Unauthorized.'))
+    data = request.json
+    user_filter = {'_id':ObjectId(valid['id'])}
+    music_filter = {'title':data['musicName']}
+    user = db.user.find_one(user_filter)
+    music = db.music.find_one(music_filter)
+    
+    music['users'].remove(valid['id'])
+    user['musics'].remove(str(music['_id']))
+    if len(music['users']) == 0:
+        db.music.delete_one(music_filter)
+    db.user.update_one(user_filter,{'$set':{'musics':user['musics']}})
+    db.music.update_one(music_filter,{'$set':{'users':music['users']}})
+    all_musics = []
+    for music_id in user['musics']:
+        user_music = db.music.find_one({'_id':ObjectId(music_id)})
+        del user_music['_id']
+        del user_music['users']
+        all_musics.append(user_music)
+    
+    return jsonify(feedback(True,200,'',all_musics))
+    
+
+
+        
+
+
     
 
 @app.route('/sign-out')
