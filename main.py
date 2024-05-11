@@ -243,7 +243,7 @@ def sign_out():
     if valid is None:
         return jsonify(feedback(False,401,'Unauthorized.'))
     res = jsonify(feedback(True,200))
-    res.set_cookie('token','',max_age=0,samesite='None')
+    res.set_cookie('token','',max_age=0,samesite='None',secure=True)
     return res
 
 
