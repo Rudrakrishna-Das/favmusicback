@@ -74,7 +74,7 @@ def google():
         user['_id'] = str(user['_id'])
         encoded_jwt = jwt.encode({"id": str(user['_id'])}, os.getenv('SECRET') , algorithm=os.getenv('ALOGORITHMS'))
         res = make_response(jsonify(feedback(True,200,'Login Success',user)))
-        res.set_cookie('token',encoded_jwt, httponly=True)
+        res.set_cookie('token',encoded_jwt, samesite='None',secure=True)
         return res
     password = str(hex(randint(11111111,99999999)))
     hashed_password =  bcrypt.hashpw(password.encode('utf-8'),bcrypt.gensalt())
